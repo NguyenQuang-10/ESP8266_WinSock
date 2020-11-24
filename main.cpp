@@ -1,10 +1,10 @@
 #define _WIN32_WINNT 0x0A00
 
 #include <iostream>
-#include <stdio.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <string>
+#include <thread>
 
 #define DEFAULT_PORT "27015"
 
@@ -32,7 +32,7 @@ void handle_client(SOCKET s){
             std::cout << std::endl;
             
             // Echo the buffer back to the sender
-            byte_sent = send(s, recieve_buffer, sizeof(recieve_buffer), 0);
+            byte_sent = send(s, recieve_buffer, byte_recv, 0);
             if (byte_sent == SOCKET_ERROR) {
                 std::cout << "Send error: " << WSAGetLastError() << std::endl;
                 closesocket(s);
@@ -48,8 +48,8 @@ void handle_client(SOCKET s){
             return;
         }
     } while (byte_recv > 0);
-
 }
+
 int main(){
     // Main object of this library
     // The WSADATA structure contains information about the Windows Sockets implementation.
@@ -57,7 +57,6 @@ int main(){
     
     // The WSAStartup function initiates use of the Winsock DLL by a process.
     int error_code;
-    int penis = 15;
     error_code = WSAStartup(MAKEWORD(2,2), &wsaData);
     if (error_code != 0){ std::cout << "Initialisation failed, exiting..." << std::endl; return 1; }
 
@@ -78,9 +77,8 @@ int main(){
         WSACleanup();
         return 1;
     }
-    
-    // std::cout << result->ai_family << std::endl;
 
+    
     SOCKET server_socket = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
     if (server_socket == INVALID_SOCKET){
         print("socket initialisation failed: ");
@@ -89,10 +87,14 @@ int main(){
         return 1;
     }
 
-    penis = bind(server_socket, result->ai_addr, (int)result->ai_addrlen);
-    if (penis == SOCKET_ERROR) {
-        printf("bind failed with error: %d\n", WSAGetLastError());
-        // std::cout << WSAGetLastError() << std::endl;
+    // for (char c : result->ai_addr->sa_data){
+    //     std::cout << c << std::endl;
+    // }
+    struct sockaddr bind_to_server_socket;
+    error_code = bind(server_socket, result->ai_addr, (int)result->ai_addrlen);
+    if (error_code == SOCKET_ERROR) {
+        print("bind failure: ");
+        std::cout << WSAGetLastError() << std::endl;
         freeaddrinfo(result);
         WSACleanup();
         return 1;
@@ -106,7 +108,7 @@ int main(){
     bool running = true;
     while (running){
         int listen_error = 0;
-        // put socket into listen state
+        print("Starting host socket...");
         listen_error = listen(server_socket, SOMAXCONN);
         if (listen_error == SOCKET_ERROR){
             print("Listening failed: ");
@@ -115,10 +117,10 @@ int main(){
             WSACleanup();
             return 1;
         } else {
-            // wait for client socket to connect then return descriptor
             accepted_socket = accept(server_socket, NULL, NULL);
+            print("Socket detected");
             handle_client(accepted_socket);
-            print("Testing 1 2 3");
+            // std::thread client_thread = std::thread([&]{ handle_client(accepted_socket); });
         }
     }
     return 0;
